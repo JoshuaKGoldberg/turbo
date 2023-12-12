@@ -413,6 +413,24 @@ jobs:
         env:
           EXPERIMENTAL_RUST_CODEPATH: true
 
+  turborepo_supported_platforms:
+    name: Turborepo Supported Platform Tests
+    needs: [determine_jobs, build_turborepo]
+    if: needs.determine_jobs.outputs.turborepo_integration == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["alpine:latest", alpine:3.17]
+
+    container:
+      image: ${{ matrix.container }}
+
+    steps:
+      - name: Verify Execution
+        run: turbo bin
+        env:
+          EXPERIMENTAL_RUST_CODEPATH: true
+
   turborepo_examples:
     name: Turborepo Examples
     needs: [determine_jobs]
