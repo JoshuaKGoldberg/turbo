@@ -218,8 +218,8 @@ impl<P: PackageDiscovery> CachingPackageDiscovery<P> {
 
 impl<P: PackageDiscovery + Send> PackageDiscovery for CachingPackageDiscovery<P> {
     async fn discover_packages(&mut self) -> Result<DiscoveryResponse, Error> {
-        match self.data.take() {
-            Some(data) => Ok(data),
+        match &self.data {
+            Some(data) => Ok(data.to_owned()),
             None => {
                 let data = self.primary.discover_packages().await?;
                 self.data = Some(data.clone());
