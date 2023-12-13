@@ -237,15 +237,18 @@ async fn handle_star_reexports(
 }
 
 #[turbo_tasks::value]
-struct ExpandResults {
-    star_exports: Vec<String>,
-    has_dynamic_exports: bool,
+pub struct ExpandResult {
+    pub esm_ref: Vc<Box<dyn ModuleReference>>,
+    pub root_module: Vc<Box<dyn EcmascriptChunkPlaceable>>,
+    pub star_exports: Vec<String>,
+    pub has_dynamic_exports: bool,
 }
 
 #[turbo_tasks::function]
-async fn expand_star_exports(
+pub async fn expand_star_exports(
+    esm_ref: Vc<Box<dyn ModuleReference>>,
     root_module: Vc<Box<dyn EcmascriptChunkPlaceable>>,
-) -> Result<Vc<ExpandResults>> {
+) -> Result<Vc<ExpandResult>> {
     let mut set = HashSet::new();
     let mut has_dynamic_exports = false;
     let mut checked_modules = HashSet::new();
@@ -327,7 +330,10 @@ async fn expand_star_exports(
             }
         }
     }
-    Ok(ExpandResults::cell(ExpandResults {
+
+    Ok(ExpandResult::cell(ExpandResult {
+        esm_ref,
+        root_module,
         star_exports: set.into_iter().collect(),
         has_dynamic_exports,
     }))
@@ -338,6 +344,25 @@ async fn expand_star_exports(
 pub struct EsmExports {
     pub exports: BTreeMap<String, EsmExport>,
     pub star_exports: Vec<Vc<Box<dyn ModuleReference>>>,
+}
+
+#[turbo_tasks::value_impl]
+impl EsmExports {
+    #[turbo_tasks::function]
+    pub async fn expand_star_exports(&self) -> Result<Vc<Vec<Vc<ExpandResult>>>> {
+        let mut results = vec![];
+
+        for esm_ref in self.star_exports.iter() {
+            if let ReferencedAsset::Some(asset) =
+                &*ReferencedAsset::from_resolve_result(esm_ref.resolve_reference()).await?
+            {
+                let export_info = expand_star_exports(*esm_ref, *asset);
+                results.push(export_info);
+            }
+        }
+
+        Ok(Vc::cell(results))
+    }
 }
 
 #[turbo_tasks::value_impl]
@@ -358,34 +383,34 @@ impl CodeGenerateable for EsmExports {
         let mut props = Vec::new();
         let mut dynamic_exports = Vec::<Box<Expr>>::new();
 
-        for esm_ref in this.star_exports.iter() {
-            if let ReferencedAsset::Some(asset) =
-                &*ReferencedAsset::from_resolve_result(esm_ref.resolve_reference()).await?
-            {
-                let export_info = expand_star_exports(*asset).await?;
-                let export_names = &export_info.star_exports;
-                for export in export_names.iter() {
-                    if !all_exports.contains_key(&Cow::<str>::Borrowed(export)) {
-                        all_exports.insert(
-                            Cow::Owned(export.clone()),
-                            Cow::Owned(EsmExport::ImportedBinding(
-                                Vc::upcast(*esm_ref),
-                                export.to_string(),
-                            )),
-                        );
-                    }
-                }
+        for expand_result in self.expand_star_exports().await? {
+            let export_info = expand_result.await?;
 
-                if export_info.has_dynamic_exports {
-                    let ident = ReferencedAsset::get_ident_from_placeable(asset).await?;
+            let export_names = &export_info.star_exports;
 
-                    dynamic_exports.push(quote_expr!(
-                        "__turbopack_dynamic__($arg)",
-                        arg: Expr = Ident::new(ident.into(), DUMMY_SP).into()
-                    ));
+            for export in export_names.iter() {
+                if !all_exports.contains_key(&Cow::<str>::Borrowed(export)) {
+                    all_exports.insert(
+                        Cow::Owned(export.clone()),
+                        Cow::Owned(EsmExport::ImportedBinding(
+                            Vc::upcast(export_info.esm_ref),
+                            export.to_string(),
+                        )),
+                    );
                 }
             }
+
+            if export_info.has_dynamic_exports {
+                let ident =
+                    ReferencedAsset::get_ident_from_placeable(&export_info.root_module).await?;
+
+                dynamic_exports.push(quote_expr!(
+                    "__turbopack_dynamic__($arg)",
+                    arg: Expr = Ident::new(ident.into(), DUMMY_SP).into()
+                ));
+            }
         }
+
         for (exported, local) in all_exports.into_iter() {
             let expr = match local.as_ref() {
                 EsmExport::Error => Some(quote!(
