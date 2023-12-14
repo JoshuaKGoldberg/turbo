@@ -205,15 +205,20 @@ impl<'a> Run<'a> {
                     sock_file: self.base.daemon_file_root().join_component("turbod.sock"),
                 };
 
-                match connector.connect().await {
-                    Ok(client) => {
+                match (connector.connect().await, opts.run_opts.daemon) {
+                    (Ok(client), _) => {
                         debug!("running in daemon mode");
                         Some(client)
                     }
-                    Err(e) => {
+                    (Err(e), Some(true)) => {
+                        debug!("failed to connect to daemon when forced {e}, exiting");
+                        return Err(e.into());
+                    }
+                    (Err(e), None) => {
                         debug!("failed to connect to daemon {e}");
                         None
                     }
+                    (_, Some(false)) => unreachable!(),
                 }
             }
             (_, Some(false)) => {
