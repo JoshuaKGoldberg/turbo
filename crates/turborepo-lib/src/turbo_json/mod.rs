@@ -16,6 +16,8 @@ use crate::{
     task_graph::{BookkeepingTaskDefinition, Pipeline, TaskDefinitionStable, TaskOutputs},
 };
 
+mod parser;
+
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SpacesJson {
@@ -570,14 +572,11 @@ mod tests {
     use turbopath::{AbsoluteSystemPath, RelativeUnixPathBuf};
     use turborepo_repository::package_json::PackageJson;
 
-    use super::RawTurboJSON;
     use crate::{
         cli::OutputLogsMode,
-        config::{turbo::RawTaskDefinition, TurboJson},
         run::task_id::TaskName,
-        task_graph::{
-            BookkeepingTaskDefinition, TaskDefinitionExperiments, TaskDefinitionStable, TaskOutputs,
-        },
+        task_graph::{BookkeepingTaskDefinition, TaskDefinitionExperiments, TaskOutputs},
+        turbo_json::{RawTaskDefinition, RawTurboJSON, TaskDefinitionStable, TurboJson},
     };
 
     #[test_case(r"{}", TurboJson::default() ; "empty")]

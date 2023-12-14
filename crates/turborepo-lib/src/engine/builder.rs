@@ -9,9 +9,9 @@ use turborepo_repository::package_graph::{
 
 use super::Engine;
 use crate::{
-    config::{validate_extends, validate_no_package_task_syntax, TurboJson},
     run::task_id::{TaskId, TaskName},
     task_graph::{BookkeepingTaskDefinition, TaskDefinition},
+    turbo_json::{validate_extends, validate_no_package_task_syntax, TurboJson},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -427,7 +427,7 @@ mod test {
     };
 
     use super::*;
-    use crate::{config::RawTurboJSON, engine::TaskNode};
+    use crate::{engine::TaskNode, turbo_json::RawTurboJSON};
 
     // Only used to prevent package graph construction from attempting to read
     // lockfile from disk

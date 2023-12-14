@@ -39,7 +39,6 @@ pub use crate::run::error::Error;
 use crate::{
     cli::{DryRunMode, EnvMode},
     commands::CommandBase,
-    config::TurboJson,
     daemon::DaemonConnector,
     engine::{Engine, EngineBuilder},
     opts::Opts,
@@ -49,6 +48,7 @@ use crate::{
     signal::{SignalHandler, SignalSubscriber},
     task_graph::Visitor,
     task_hash::{get_external_deps_hash, PackageInputsHashes},
+    turbo_json::TurboJson,
 };
 
 #[derive(Debug)]

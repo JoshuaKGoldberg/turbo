@@ -14,7 +14,7 @@ use turborepo_repository::{
 use turborepo_ui::BOLD;
 
 use super::CommandBase;
-use crate::config::RawTurboJSON;
+use crate::turbo_json::RawTurboJSON;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
